@@ -1,0 +1,113 @@
+{
+  "name": "agent-code-tracker",
+  "displayName": "Agent Code Tracker",
+  "description": "Track and calculate the percentage of code written by AI agents vs manual code contributions",
+  "version": "0.0.1",
+  "publisher": "agangu",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agangu/agent-code-tracker"
+  },
+  "engines": {
+    "vscode": "^1.108.1"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "agent-code-tracker.showStats",
+        "title": "Agent Code Tracker: Show Statistics"
+      },
+      {
+        "command": "agent-code-tracker.resetStats",
+        "title": "Agent Code Tracker: Reset All Statistics"
+      },
+      {
+        "command": "agent-code-tracker.resetFileStats",
+        "title": "Agent Code Tracker: Reset Current File Statistics"
+      },
+      {
+        "command": "agent-code-tracker.exportJsonReport",
+        "title": "Agent Code Tracker: Export Report (JSON)"
+      },
+      {
+        "command": "agent-code-tracker.exportHtmlReport",
+        "title": "Agent Code Tracker: Export Report (HTML)"
+      },
+      {
+        "command": "agent-code-tracker.copyReport",
+        "title": "Agent Code Tracker: Copy Report to Clipboard"
+      }
+    ],
+    "configuration": {
+      "title": "Agent Code Tracker",
+      "properties": {
+        "agentCodeTracker.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Enable/disable agent code tracking. Can be set per workspace folder or project."
+        },
+        "agentCodeTracker.minCharsForAgent": {
+          "type": "number",
+          "default": 30,
+          "scope": "resource",
+          "description": "Minimum characters inserted at once to consider it agent-generated code"
+        },
+        "agentCodeTracker.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Show/hide the status bar item"
+        },
+        "agentCodeTracker.baseAgentPercentage": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 100,
+          "scope": "resource",
+          "description": "Base AI-agent percentage to apply to pre-existing code when a file is first tracked. Use this for projects that already had AI-written code before the extension was installed (e.g., set to 40 if ~40% was AI-generated)."
+        },
+        "agentCodeTracker.trackTokenUsage": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Track estimated token usage per change"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.108.1",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.54.0",
+    "eslint": "^9.39.2",
+    "esbuild": "^0.27.2",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.9.3",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
