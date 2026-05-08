@@ -3,3 +3,23 @@ dist
 node_modules
 .vscode-test/
 *.vsix
+
+# Local editor settings
+.vscode/
+
+# Environment and secret files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+
+# Logs and coverage
+*.log
+coverage/
+
+# Generated tracker artifacts with user/machine metadata
+.agent-tracker/users/
+.agent-tracker/logs/

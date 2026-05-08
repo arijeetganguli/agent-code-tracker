@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { StatsStorage } from './statsStorage';
+import { StatsStorage, TeamStatsResult } from './statsStorage';
 
 export interface CodeStats {
     totalChars: number;
@@ -24,6 +24,12 @@ export interface UsageReport {
     totalTokensEstimated: number;
     agentTokensEstimated: number;
     manualTokensEstimated: number;
+}
+
+export interface TeamCoverageReport {
+    branch: string;
+    perUser: TeamStatsResult['perUser'];
+    overall: CodeStats;
 }
 
 export interface FileStats {
@@ -401,7 +407,32 @@ export class CodeTracker {
         perUser: { [username: string]: { fileStats: FileStats } };
         merged: FileStats;
     }> {
-        return this.storage.loadAllUsersStats();
+        const team = await this.storage.loadAllUsersStats();
+        const simplified: { [username: string]: { fileStats: FileStats } } = {};
+        for (const [username, stats] of Object.entries(team.perUser)) {
+            simplified[username] = { fileStats: stats.fileStats };
+        }
+
+        return {
+            perUser: simplified,
+            merged: team.merged
+        };
+    }
+
+    /**
+     * Get branch-aware team coverage summary (per-user + overall)
+     */
+    public async getTeamCoverage(branch?: string): Promise<TeamCoverageReport> {
+        const team = await this.storage.loadAllUsersStats(branch);
+        return {
+            branch: team.branch,
+            perUser: team.perUser,
+            overall: team.overall
+        };
+    }
+
+    public getCurrentBranch(): string {
+        return this.storage.getCurrentBranch();
     }
 
     /**

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
+import { execSync } from 'child_process';
 import { CodeStats, FileStats, TokenUsage } from './codeTracker';
 
 /**
@@ -11,8 +12,22 @@ export interface UserStatsFile {
     version: 2;
     user: string;
     machine: string;
+    branch: string;
     lastUpdated: string;
     fileStats: { [relativePath: string]: CodeStats };
+}
+
+export interface TeamUserStats {
+    branch: string;
+    fileStats: FileStats;
+    summary: CodeStats;
+}
+
+export interface TeamStatsResult {
+    branch: string;
+    perUser: { [username: string]: TeamUserStats };
+    merged: FileStats;
+    overall: CodeStats;
 }
 
 /**
@@ -32,12 +47,14 @@ const LOGS_DIR = 'logs';
 export class StatsStorage {
     private workspaceRoot: string | undefined;
     private username: string;
+    private branchName: string;
     private pendingLogLines: string[] = [];
     private saveTimer: ReturnType<typeof setTimeout> | undefined;
 
     constructor() {
         this.workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         this.username = os.userInfo().username || 'unknown';
+        this.branchName = this.detectCurrentBranch();
     }
 
     /**
@@ -89,6 +106,7 @@ export class StatsStorage {
      */
     public async saveUserStats(fileStats: FileStats, tokenUsage: TokenUsage[]): Promise<void> {
         if (!await this.ensureDirs()) { return; }
+        this.refreshBranchName();
 
         const trackerDir = this.getTrackerDir()!;
 
@@ -106,11 +124,12 @@ export class StatsStorage {
             version: 2,
             user: this.username,
             machine: os.hostname(),
+            branch: this.branchName,
             lastUpdated: new Date().toISOString(),
             fileStats: relativeStats
         };
 
-        const filePath = path.join(trackerDir, USERS_DIR, `${this.username}.json`);
+        const filePath = path.join(trackerDir, USERS_DIR, this.getUserStatsFileName(this.branchName));
         const content = JSON.stringify(userFile, null, 2) + '\n';
         await vscode.workspace.fs.writeFile(
             vscode.Uri.file(filePath),
@@ -175,7 +194,11 @@ export class StatsStorage {
         const trackerDir = this.getTrackerDir();
         if (!trackerDir) { return { fileStats: {}, tokenUsage: [] }; }
 
-        const filePath = path.join(trackerDir, USERS_DIR, `${this.username}.json`);
+        const filePath = await this.resolveCurrentUserFilePath(trackerDir);
+        if (!filePath) {
+            return { fileStats: {}, tokenUsage: [] };
+        }
+
         try {
             const text = await this.readFileText(filePath);
             const data = JSON.parse(text) as UserStatsFile;
@@ -231,17 +254,21 @@ export class StatsStorage {
      * Read all users' stats and merge into a combined view.
      * Used for team-wide reporting.
      */
-    public async loadAllUsersStats(): Promise<{
-        perUser: { [username: string]: { fileStats: FileStats } };
-        merged: FileStats;
-    }> {
+    public async loadAllUsersStats(branchFilter?: string): Promise<TeamStatsResult> {
         const trackerDir = this.getTrackerDir();
+        this.refreshBranchName();
+        const activeBranch = branchFilter ?? this.branchName;
         if (!trackerDir) {
-            return { perUser: {}, merged: {} };
+            return {
+                branch: activeBranch,
+                perUser: {},
+                merged: {},
+                overall: { totalChars: 0, agentChars: 0, manualChars: 0, percentage: 0 }
+            };
         }
 
         const usersDir = path.join(trackerDir, USERS_DIR);
-        const perUser: { [username: string]: { fileStats: FileStats } } = {};
+        const perUser: { [username: string]: TeamUserStats } = {};
         const merged: FileStats = {};
 
         try {
@@ -254,6 +281,10 @@ export class StatsStorage {
                 try {
                     const text = await this.readFileText(path.join(usersDir, fileName));
                     const data = JSON.parse(text) as UserStatsFile;
+                    const userBranch = data.branch || 'unknown';
+                    if (userBranch !== activeBranch) {
+                        continue;
+                    }
                     const userStats: FileStats = {};
 
                     for (const [relPath, stats] of Object.entries(data.fileStats)) {
@@ -269,7 +300,11 @@ export class StatsStorage {
                         merged[absPath].manualChars += stats.manualChars;
                     }
 
-                    perUser[data.user] = { fileStats: userStats };
+                    perUser[data.user] = {
+                        branch: userBranch,
+                        fileStats: userStats,
+                        summary: this.computeSummary(userStats)
+                    };
                 } catch {
                     // Skip corrupt user files
                 }
@@ -285,7 +320,12 @@ export class StatsStorage {
             // Users directory doesn't exist yet
         }
 
-        return { perUser, merged };
+        return {
+            branch: activeBranch,
+            perUser,
+            merged,
+            overall: this.computeSummary(merged)
+        };
     }
 
     /**
@@ -296,12 +336,16 @@ export class StatsStorage {
         if (!this.workspaceRoot) { return; }
 
         const gaPath = path.join(this.workspaceRoot, '.gitattributes');
-        const markerLine = '.agent-tracker/logs/*.jsonl merge=union';
+        const markerLines = [
+            '.agent-tracker/logs/*.jsonl merge=union',
+            '.agent-tracker/users/*.json merge=union'
+        ];
 
         try {
             const existing = await this.readFileText(gaPath);
-            if (existing.includes(markerLine)) { return; }
-            const updated = existing.trimEnd() + '\n' + markerLine + '\n';
+            const missing = markerLines.filter(line => !existing.includes(line));
+            if (missing.length === 0) { return; }
+            const updated = existing.trimEnd() + '\n' + missing.join('\n') + '\n';
             await vscode.workspace.fs.writeFile(
                 vscode.Uri.file(gaPath),
                 Buffer.from(updated, 'utf-8')
@@ -310,7 +354,7 @@ export class StatsStorage {
             // .gitattributes doesn't exist, create it
             await vscode.workspace.fs.writeFile(
                 vscode.Uri.file(gaPath),
-                Buffer.from(markerLine + '\n', 'utf-8')
+                Buffer.from(markerLines.join('\n') + '\n', 'utf-8')
             );
         }
     }
@@ -322,5 +366,83 @@ export class StatsStorage {
 
     public getUsername(): string {
         return this.username;
+    }
+
+    public getCurrentBranch(): string {
+        this.refreshBranchName();
+        return this.branchName;
+    }
+
+    private refreshBranchName(): void {
+        this.branchName = this.detectCurrentBranch();
+    }
+
+    private detectCurrentBranch(): string {
+        if (!this.workspaceRoot) {
+            return 'unknown';
+        }
+
+        try {
+            const branch = execSync('git rev-parse --abbrev-ref HEAD', {
+                cwd: this.workspaceRoot,
+                stdio: ['ignore', 'pipe', 'ignore'],
+                encoding: 'utf-8'
+            }).trim();
+
+            return branch || 'unknown';
+        } catch {
+            return 'unknown';
+        }
+    }
+
+    private computeSummary(fileStats: FileStats): CodeStats {
+        let totalChars = 0;
+        let agentChars = 0;
+        let manualChars = 0;
+
+        for (const stats of Object.values(fileStats)) {
+            totalChars += stats.totalChars;
+            agentChars += stats.agentChars;
+            manualChars += stats.manualChars;
+        }
+
+        const percentage = totalChars > 0 ? (agentChars / totalChars) * 100 : 0;
+
+        return {
+            totalChars,
+            agentChars,
+            manualChars,
+            percentage
+        };
+    }
+
+    private getUserStatsFileName(branch: string): string {
+        const safeBranch = this.sanitizeForFileName(branch);
+        const safeUser = this.sanitizeForFileName(this.username);
+        return `${safeUser}--${safeBranch}.json`;
+    }
+
+    private sanitizeForFileName(value: string): string {
+        return value.replace(/[^a-zA-Z0-9._-]/g, '_');
+    }
+
+    private async resolveCurrentUserFilePath(trackerDir: string): Promise<string | undefined> {
+        const usersDir = path.join(trackerDir, USERS_DIR);
+        const branchFilePath = path.join(usersDir, this.getUserStatsFileName(this.branchName));
+
+        try {
+            await vscode.workspace.fs.stat(vscode.Uri.file(branchFilePath));
+            return branchFilePath;
+        } catch {
+            // Fall through to legacy name support.
+        }
+
+        const legacyPath = path.join(usersDir, `${this.username}.json`);
+        try {
+            await vscode.workspace.fs.stat(vscode.Uri.file(legacyPath));
+            return legacyPath;
+        } catch {
+            return undefined;
+        }
     }
 }

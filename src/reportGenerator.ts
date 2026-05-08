@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { CodeTracker, UsageReport } from './codeTracker';
+import { CodeTracker, TeamCoverageReport, UsageReport } from './codeTracker';
 
 export class ReportGenerator {
     constructor(private codeTracker: CodeTracker) {}
@@ -10,6 +10,12 @@ export class ReportGenerator {
      */
     public async exportJsonReport(): Promise<void> {
         const report = this.codeTracker.generateUsageReport();
+        const teamCoverage = await this.codeTracker.getTeamCoverage();
+        const enrichedReport = {
+            ...report,
+            branch: this.codeTracker.getCurrentBranch(),
+            teamCoverage
+        };
         const uri = await vscode.window.showSaveDialog({
             defaultUri: vscode.Uri.file(
                 path.join(
@@ -21,7 +27,7 @@ export class ReportGenerator {
         });
 
         if (uri) {
-            const content = JSON.stringify(report, null, 2);
+            const content = JSON.stringify(enrichedReport, null, 2);
             await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf-8'));
             vscode.window.showInformationMessage(`Report saved to ${uri.fsPath}`);
         }
@@ -32,6 +38,7 @@ export class ReportGenerator {
      */
     public async exportHtmlReport(): Promise<void> {
         const report = this.codeTracker.generateUsageReport();
+        const teamCoverage = await this.codeTracker.getTeamCoverage();
         const uri = await vscode.window.showSaveDialog({
             defaultUri: vscode.Uri.file(
                 path.join(
@@ -43,7 +50,7 @@ export class ReportGenerator {
         });
 
         if (uri) {
-            const html = this.generateHtmlReport(report);
+            const html = this.generateHtmlReport(report, teamCoverage);
             await vscode.workspace.fs.writeFile(uri, Buffer.from(html, 'utf-8'));
             vscode.window.showInformationMessage(`HTML report saved to ${uri.fsPath}`);
         }
@@ -54,7 +61,8 @@ export class ReportGenerator {
      */
     public async copyReportToClipboard(): Promise<void> {
         const report = this.codeTracker.generateUsageReport();
-        const summary = this.generateTextSummary(report);
+        const teamCoverage = await this.codeTracker.getTeamCoverage();
+        const summary = this.generateTextSummary(report, teamCoverage);
         await vscode.env.clipboard.writeText(summary);
         vscode.window.showInformationMessage('Usage report copied to clipboard');
     }
@@ -64,13 +72,15 @@ export class ReportGenerator {
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     }
 
-    private generateTextSummary(report: UsageReport): string {
+    private generateTextSummary(report: UsageReport, teamCoverage?: TeamCoverageReport): string {
         const ws = report.workspaceStats;
         const fileEntries = Object.entries(report.fileStats);
+        const teamEntries = Object.entries(teamCoverage?.perUser ?? {});
         const lines = [
             `Agent Code Tracker — Usage Report`,
             `Project: ${report.projectName}`,
             `Generated: ${new Date(report.generatedAt).toLocaleString()}`,
+            `Branch: ${this.codeTracker.getCurrentBranch()}`,
             ``,
             `=== Workspace Summary ===`,
             `Total Characters: ${ws.totalChars.toLocaleString()}`,
@@ -83,6 +93,23 @@ export class ReportGenerator {
             `Manual Tokens: ${report.manualTokensEstimated.toLocaleString()}`,
             ``
         ];
+
+        if (teamCoverage) {
+            lines.push(`=== Team Coverage (${teamCoverage.branch}) ===`);
+            lines.push(`Users Contributed: ${teamEntries.length}`);
+            lines.push(`Overall Team Chars: ${teamCoverage.overall.totalChars.toLocaleString()}`);
+            lines.push(`Overall Agent Code: ${teamCoverage.overall.agentChars.toLocaleString()} (${teamCoverage.overall.percentage.toFixed(1)}%)`);
+            lines.push(`Overall Manual Code: ${teamCoverage.overall.manualChars.toLocaleString()} (${(100 - teamCoverage.overall.percentage).toFixed(1)}%)`);
+            lines.push('');
+
+            if (teamEntries.length > 0) {
+                lines.push('Per-User Coverage:');
+                for (const [user, stats] of teamEntries) {
+                    lines.push(`  ${user}: ${stats.summary.percentage.toFixed(1)}% agent (${stats.summary.totalChars.toLocaleString()} chars)`);
+                }
+                lines.push('');
+            }
+        }
 
         if (fileEntries.length > 0) {
             lines.push(`=== Per-File Breakdown ===`);
@@ -97,9 +124,12 @@ export class ReportGenerator {
     /**
      * Generate a standalone HTML report that can be shared
      */
-    private generateHtmlReport(report: UsageReport): string {
+    private generateHtmlReport(report: UsageReport, teamCoverage: TeamCoverageReport): string {
         const ws = report.workspaceStats;
         const fileEntries = Object.entries(report.fileStats);
+        const teamEntries = Object.entries(teamCoverage.perUser).sort(
+            (a, b) => b[1].summary.totalChars - a[1].summary.totalChars
+        );
 
         const fileRows = fileEntries.map(([filePath, stats]) => `
             <tr>
@@ -114,6 +144,16 @@ export class ReportGenerator {
                     </div>
                 </td>
             </tr>`).join('');
+
+        const teamRows = teamEntries.map(([user, stats]) => `
+            <tr>
+                <td>${this.escapeHtml(user)}</td>
+                <td>${stats.summary.totalChars.toLocaleString()}</td>
+                <td>${stats.summary.agentChars.toLocaleString()}</td>
+                <td>${stats.summary.manualChars.toLocaleString()}</td>
+                <td>${stats.summary.percentage.toFixed(1)}%</td>
+            </tr>
+        `).join('');
 
         return `<!DOCTYPE html>
 <html lang="en">
@@ -161,6 +201,21 @@ export class ReportGenerator {
   </div>
 
   <div class="section">
+        <h2>Team Coverage (Branch: ${this.escapeHtml(teamCoverage.branch)})</h2>
+        <div class="grid">
+            <div class="card"><div class="label">Users Contributed</div><div class="value">${teamEntries.length}</div></div>
+            <div class="card"><div class="label">Overall Team Chars</div><div class="value">${teamCoverage.overall.totalChars.toLocaleString()}</div></div>
+            <div class="card"><div class="label">Overall Agent</div><div class="value">${teamCoverage.overall.agentChars.toLocaleString()}</div></div>
+            <div class="card"><div class="label">Overall Coverage</div><div class="value">${teamCoverage.overall.percentage.toFixed(1)}%</div></div>
+        </div>
+        ${teamEntries.length === 0 ? '<p style="color:#888">No merged user stats found for this branch yet.</p>' : `
+        <table>
+            <thead><tr><th>User</th><th>Total</th><th>Agent</th><th>Manual</th><th>Coverage</th></tr></thead>
+            <tbody>${teamRows}</tbody>
+        </table>`}
+    </div>
+
+    <div class="section">
     <h2>Token Usage (Estimated)</h2>
     <div class="grid">
       <div class="card"><div class="label">Total Tokens</div><div class="value">${report.totalTokensEstimated.toLocaleString()}</div></div>

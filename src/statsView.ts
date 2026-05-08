@@ -8,7 +8,7 @@ export class StatsViewProvider {
     /**
      * Show detailed statistics in a webview panel
      */
-    public showStats(context: vscode.ExtensionContext): void {
+    public async showStats(context: vscode.ExtensionContext): Promise<void> {
         const panel = vscode.window.createWebviewPanel(
             'agentCodeTrackerStats',
             'Agent Code Tracker - Statistics',
@@ -19,22 +19,23 @@ export class StatsViewProvider {
             }
         );
 
-        panel.webview.html = this.getWebviewContent();
+        panel.webview.html = '<html><body style="font-family: var(--vscode-font-family); padding: 20px;">Loading statistics...</body></html>';
+        await this.renderPanel(panel);
 
         // Handle messages from the webview
         panel.webview.onDidReceiveMessage(
-            message => {
+            async message => {
                 switch (message.command) {
                     case 'resetAll':
                         this.handleResetAll();
-                        panel.webview.html = this.getWebviewContent();
+                        await this.renderPanel(panel);
                         break;
                     case 'resetFile':
                         this.handleResetFile(message.filePath);
-                        panel.webview.html = this.getWebviewContent();
+                        await this.renderPanel(panel);
                         break;
                     case 'refresh':
-                        panel.webview.html = this.getWebviewContent();
+                        await this.renderPanel(panel);
                         break;
                 }
             },
@@ -70,9 +71,19 @@ export class StatsViewProvider {
     /**
      * Generate HTML content for the webview
      */
-    private getWebviewContent(): string {
+    private async renderPanel(panel: vscode.WebviewPanel): Promise<void> {
+        panel.webview.html = await this.getWebviewContent();
+    }
+
+    /**
+     * Generate HTML content for the webview
+     */
+    private async getWebviewContent(): Promise<string> {
         const workspaceStats = this.codeTracker.getWorkspaceStats();
         const fileStats = this.codeTracker.getAllFileStats();
+        const teamCoverage = await this.codeTracker.getTeamCoverage();
+        const teamEntries = Object.entries(teamCoverage.perUser)
+            .sort((a, b) => b[1].summary.totalChars - a[1].summary.totalChars);
 
         return `<!DOCTYPE html>
 <html lang="en">
@@ -187,6 +198,21 @@ export class StatsViewProvider {
             padding: 40px;
             color: var(--vscode-descriptionForeground);
         }
+        .team-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .team-table th,
+        .team-table td {
+            text-align: left;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            font-size: 12px;
+        }
+        .muted {
+            color: var(--vscode-descriptionForeground);
+        }
     </style>
 </head>
 <body>
@@ -220,6 +246,29 @@ export class StatsViewProvider {
         </div>
     </div>
 
+    <div class="summary">
+        <h2>Team Coverage (Branch: ${this.escapeHtml(teamCoverage.branch)})</h2>
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-label">Users Contributed</div>
+                <div class="stat-value">${teamEntries.length}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Overall Team Chars</div>
+                <div class="stat-value">${teamCoverage.overall.totalChars.toLocaleString()}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Overall Team Agent</div>
+                <div class="stat-value">${teamCoverage.overall.agentChars.toLocaleString()}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Overall Coverage</div>
+                <div class="stat-value">${teamCoverage.overall.percentage.toFixed(1)}%</div>
+            </div>
+        </div>
+        ${this.generateTeamCoverageHTML(teamEntries)}
+    </div>
+
     <div class="button-group">
         <button onclick="refreshStats()">🔄 Refresh</button>
         <button onclick="resetAllStats()">🗑️ Reset All Statistics</button>
@@ -245,6 +294,39 @@ export class StatsViewProvider {
     </script>
 </body>
 </html>`;
+    }
+
+    private generateTeamCoverageHTML(
+        teamEntries: Array<[string, { summary: { totalChars: number; agentChars: number; manualChars: number; percentage: number } }]>
+    ): string {
+        if (teamEntries.length === 0) {
+            return '<p class="muted">No merged user stats found for this branch yet. Commit and merge .agent-tracker/users/*.json files to see team coverage.</p>';
+        }
+
+        const rows = teamEntries.map(([username, stats]) => `
+            <tr>
+                <td>${this.escapeHtml(username)}</td>
+                <td>${stats.summary.totalChars.toLocaleString()}</td>
+                <td>${stats.summary.agentChars.toLocaleString()}</td>
+                <td>${stats.summary.manualChars.toLocaleString()}</td>
+                <td>${stats.summary.percentage.toFixed(1)}%</td>
+            </tr>
+        `).join('');
+
+        return `
+            <table class="team-table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Total</th>
+                        <th>Agent</th>
+                        <th>Manual</th>
+                        <th>Coverage</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        `;
     }
 
     /**
@@ -275,5 +357,13 @@ export class StatsViewProvider {
                 </div>
             `).join('')}
         </div>`;
+    }
+
+    private escapeHtml(value: string): string {
+        return value
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
     }
 }

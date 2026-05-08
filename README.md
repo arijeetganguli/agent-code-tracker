@@ -4,13 +4,18 @@ Track and calculate the percentage of code written by AI agents (like GitHub Cop
 
 ## 🎯 Features
 
-- **Real-time Tracking**: Automatically monitors all code changes in your workspace
-- **Smart Detection**: Uses intelligent heuristics to detect AI-generated vs manually written code
-- **Status Bar Display**: Shows agent code percentage for the current file in the status bar
-- **Detailed Statistics**: View comprehensive statistics for all files in your workspace
-- **Per-File Analytics**: Track statistics individually for each file
-- **Persistent Data**: Statistics are saved and restored across VS Code sessions
-- **Easy Reset**: Reset statistics for individual files or the entire workspace
+- **Real-time Change Tracking**: Monitors document edits as you code and classifies changes as agent or manual
+- **Heuristic Agent Detection**: Identifies likely AI-generated insertions using size, structure, and code-pattern heuristics
+- **Workspace and File-Level Analytics**: Tracks totals, agent/manual character counts, and percentages per file and across the project
+- **Branch-Aware Team Tracking**: Preserves per-user stats by branch and aggregates them after merges
+- **Per-User + Overall Coverage**: Shows contributor-level coverage and combined team coverage for the active branch
+- **Status Bar Insights**: Shows current file attribution percentage with quick access to detailed stats
+- **Interactive Statistics Dashboard**: Displays summary cards, progress bars, and per-file breakdown in a webview
+- **Report Sharing**: Export usage reports as JSON or standalone HTML, or copy a text summary to clipboard
+- **Token Usage Estimation**: Estimates token consumption per change and includes token totals in reports
+- **Persistent Project Data**: Stores tracking data across sessions so historical attribution is preserved
+- **Flexible Baseline Support**: Optionally apply a base AI percentage when first tracking existing files
+- **Reset Controls**: Reset statistics for the current file or the entire workspace
 
 ## 📊 How It Works
 
@@ -35,6 +40,9 @@ Open the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P`) and use:
 - **Agent Code Tracker: Show Statistics** - Opens a detailed view of all statistics
 - **Agent Code Tracker: Reset All Statistics** - Resets statistics for all files
 - **Agent Code Tracker: Reset Current File Statistics** - Resets statistics for the active file
+- **Agent Code Tracker: Export Report (JSON)** - Saves a machine-readable usage report
+- **Agent Code Tracker: Export Report (HTML)** - Saves a shareable visual report
+- **Agent Code Tracker: Copy Report to Clipboard** - Copies a plain-text summary for quick sharing
 
 ## ⚙️ Extension Settings
 
@@ -43,6 +51,8 @@ This extension contributes the following settings:
 - `agentCodeTracker.enabled`: Enable/disable agent code tracking (default: `true`)
 - `agentCodeTracker.minCharsForAgent`: Minimum characters inserted at once to consider it agent-generated (default: `30`)
 - `agentCodeTracker.showStatusBar`: Show/hide the status bar item (default: `true`)
+- `agentCodeTracker.baseAgentPercentage`: Baseline AI attribution for pre-existing file content on first track (default: `0`)
+- `agentCodeTracker.trackTokenUsage`: Enable/disable estimated token usage tracking (default: `true`)
 
 ## 🎨 Status Bar
 

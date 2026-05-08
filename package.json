@@ -2,12 +2,12 @@
   "name": "agent-code-tracker",
   "displayName": "Agent Code Tracker",
   "description": "Track and calculate the percentage of code written by AI agents vs manual code contributions",
-  "version": "0.0.1",
-  "publisher": "agangu",
+  "version": "0.0.2",
+  "publisher": "arijeetganguli",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/agangu/agent-code-tracker"
+    "url": "https://github.com/arijeetganguli/agent-code-tracker"
   },
   "engines": {
     "vscode": "^1.108.1"
