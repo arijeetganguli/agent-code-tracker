@@ -1,0 +1,7 @@
+# Default owners for the repository
+* @arijeetganguli
+
+# Critical project files
+/package.json @arijeetganguli
+/src/ @arijeetganguli
+/.github/workflows/ @arijeetganguli
