@@ -17,3 +17,5 @@
 *.md text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
+.agent-tracker/logs/*.jsonl merge=union
+.agent-tracker/users/*.json merge=union
