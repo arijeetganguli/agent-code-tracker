@@ -112,13 +112,18 @@ npm run package        # Build for production
 ```
 agent-code-tracker/
 ├── src/
-│   ├── extension.ts       # Main extension entry point
-│   ├── codeTracker.ts     # Core tracking logic
-│   ├── statusBar.ts       # Status bar management
-│   └── statsView.ts       # Statistics webview
-├── package.json           # Extension manifest
-├── tsconfig.json         # TypeScript configuration
-└── README.md             # This file
+│   ├── extension.ts        # Main extension entry point & command registration
+│   ├── codeTracker.ts      # Core tracking logic & heuristic detection
+│   ├── statsStorage.ts     # Per-user persistence & branch-aware storage
+│   ├── reportGenerator.ts  # JSON, HTML & clipboard report generation
+│   ├── statusBar.ts        # Status bar item management
+│   └── statsView.ts        # Statistics webview panel
+├── .agent-tracker/         # Runtime data (auto-created, gitignore recommended)
+│   ├── users/              # Per-user stats JSON files
+│   └── logs/               # Append-only token usage JSONL logs
+├── package.json            # Extension manifest
+├── tsconfig.json           # TypeScript configuration
+└── README.md               # This file
 ```
 
 ## 🤝 Contributing
@@ -130,7 +135,7 @@ Contributions are welcome! The extension uses:
 
 ## 📄 License
 
-This extension is provided as-is for tracking code authorship in development environments.
+This project is licensed under the [MIT License](LICENSE).
 
 ## 🐛 Known Issues
 
@@ -138,39 +143,8 @@ This extension is provided as-is for tracking code authorship in development env
 - Some edge cases might misclassify code origin
 - Large paste operations might be detected as agent code
 
-## 📝 Release Notes
-
-### 0.0.1
-
-Initial release of Agent Code Tracker:
-- Real-time code tracking
-- Status bar integration
-- Detailed statistics view
-- Per-file and workspace-wide analytics
-- Configurable settings
-
 ---
 
+See [CHANGELOG.md](CHANGELOG.md) for the full version history.
+
 **Enjoy tracking your code authorship!** 🎉
-
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
