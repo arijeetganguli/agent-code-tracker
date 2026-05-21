@@ -35,3 +35,7 @@ Use clear imperative messages, for example:
 
 Do not commit secrets, API keys, or private credentials.
 If you find a security issue, follow SECURITY.md.
+
+## Community Expectations
+
+By participating in this project, you agree to follow CODE_OF_CONDUCT.md.

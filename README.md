@@ -1,5 +1,14 @@
 # Agent Code Tracker
 
+[![CI](https://github.com/arijeetganguli/agent-code-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/arijeetganguli/agent-code-tracker/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/arijeetganguli/agent-code-tracker/actions/workflows/codeql.yml/badge.svg)](https://github.com/arijeetganguli/agent-code-tracker/actions/workflows/codeql.yml)
+[![Secret Scan](https://github.com/arijeetganguli/agent-code-tracker/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/arijeetganguli/agent-code-tracker/actions/workflows/gitleaks.yml)
+[![VS Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/arijeetganguli.agent-code-tracker)](https://marketplace.visualstudio.com/items?itemName=arijeetganguli.agent-code-tracker)
+[![VS Marketplace Installs](https://img.shields.io/visual-studio-marketplace/i/arijeetganguli.agent-code-tracker)](https://marketplace.visualstudio.com/items?itemName=arijeetganguli.agent-code-tracker)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![VS Code Engine](https://img.shields.io/badge/VS%20Code-%5E1.108-007ACC?logo=visualstudiocode&logoColor=white)](https://code.visualstudio.com/)
+
 Track and calculate the percentage of code written by AI agents (like GitHub Copilot) versus manual code contributions in your VS Code workspace.
 
 ## 🎯 Features
